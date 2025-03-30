@@ -53,7 +53,7 @@ impl ECSCape {
         while let Some(msg) = recv_stream.next().await {
             match msg? {
                 ProtocolMessage::IAMRoleCredentialsMessage(role_creds) => {
-                    info!("received role creds: {:#?}", role_creds);
+                    info!("ACS received role creds: {:#?}", role_creds);
 
                     let ack_request = IAMRoleCredentialsAckRequest {
                         message_id: role_creds.message_id.clone(),
@@ -67,7 +67,9 @@ impl ECSCape {
                         .send(ProtocolMessage::IAMRoleCredentialsAckRequest(ack_request))
                         .await?;
                 }
-                _ => {}
+                msg => {
+                    info!("ACS received message: {:#?}", msg);
+                }
             }
         }
 
