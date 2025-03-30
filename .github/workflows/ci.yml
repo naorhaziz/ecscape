@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm
+          cargo install cross
+
+      - name: Install Rust Target
+        run: |
+          rustup target add ${{ matrix.target }}
+          rustup update
+
+      - name: Compile
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Strip Binary
+        run: |
+          llvm-strip target/${{ matrix.target }}/release/ecscape
+
+      - name: Upload Built Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecscape-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/ecscape
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Built Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ecscape-${{ matrix.arch }}-unknown-linux-musl
+          path: .
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and Tag Docker Image
+        run: |
+          docker build --platform linux/${{ matrix.arch }} \
+            -t naorhaziz/ecscape:${{ matrix.arch }} \
+            --build-arg ARCH=${{ matrix.arch }} .
+
+      - name: Push Docker Image
+        run: docker push naorhaziz/ecscape:${{ matrix.arch }}
+
+  manifest:
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Create and Push Multi-Arch Manifest
+        run: |
+          docker manifest create naorhaziz/ecscape:latest \
+            --amend naorhaziz/ecscape:x86_64 \
+            --amend naorhaziz/ecscape:aarch64
+          docker manifest push naorhaziz/ecscape:latest
