@@ -11,3 +11,9 @@ pub static ARCH: LazyLock<&'static str> = LazyLock::new(|| match std::env::const
     "aarch64" => "arm64",
     other => other,
 });
+
+pub const ACS_PROTOCOL_VERSION: &str = "2";
+pub const ACS_PROTOCOL_SEC_NUM: &str = "1";
+pub const ACS_PROTOCOL_SEND_CREDENTIALS: bool = true;
+
+pub const SEC_WEBSOCKET_VERSION: &str = "13";
