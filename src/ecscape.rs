@@ -7,7 +7,9 @@ use futures_util::{SinkExt, StreamExt};
 use tracing::{debug, info};
 use url::Url;
 
-use crate::config::{ACS_PROTOCOL_SEC_NUM, ACS_PROTOCOL_SEND_CREDENTIALS, ACS_PROTOCOL_VERSION};
+use crate::config::{
+    ACS_PROTOCOL_SEC_NUM, ACS_PROTOCOL_SEND_CREDENTIALS, ACS_PROTOCOL_VERSION, DOCKER_VERSION,
+};
 use crate::ecs_agent_metadata::ECSAgentMetadata;
 use crate::ecs_protocol_client::ECSProtocolClient;
 use crate::imds_metadata::IMDSMetadata;
@@ -82,6 +84,7 @@ impl ECSCape {
                 "containerInstanceArn",
                 &self.ecs_agent_metadata.container_instance_arn,
             )
+            .append_pair("dockerVersion", DOCKER_VERSION)
             .append_pair("protocolVersion", ACS_PROTOCOL_VERSION)
             .append_pair("seqNum", ACS_PROTOCOL_SEC_NUM)
             .append_pair(

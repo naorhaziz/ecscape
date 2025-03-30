@@ -17,3 +17,5 @@ pub const ACS_PROTOCOL_SEC_NUM: &str = "1";
 pub const ACS_PROTOCOL_SEND_CREDENTIALS: bool = true;
 
 pub const SEC_WEBSOCKET_VERSION: &str = "13";
+
+pub const DOCKER_VERSION: &str = "25.0.6";
