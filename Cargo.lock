@@ -583,9 +583,11 @@ dependencies = [
  "mimalloc",
  "regex",
  "reqwest",
+ "rustls 0.23.25",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-rustls 0.26.2",
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
@@ -1690,6 +1692,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "822ee9188ac4ec04a2f0531e55d035fb2de73f18b41a63c70c2712503b6fb13c"
 dependencies = [
  "aws-lc-rs",
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -2150,9 +2153,12 @@ checksum = "7a9daff607c6d2bf6c16fd681ccb7eecc83e4e2cdc1ca067ffaadfca5de7f084"
 dependencies = [
  "futures-util",
  "log",
+ "rustls 0.23.25",
+ "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.2",
  "tungstenite",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -2270,6 +2276,8 @@ dependencies = [
  "httparse",
  "log",
  "rand",
+ "rustls 0.23.25",
+ "rustls-pki-types",
  "sha1",
  "thiserror",
  "utf-8",

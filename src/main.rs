@@ -22,6 +22,10 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install rustls crypto provider");
+
     tracing_subscriber::fmt::init();
 
     info!("starting ecscape (version: {}, arch: {})", *VERSION, *ARCH);
