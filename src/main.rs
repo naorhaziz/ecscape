@@ -1,4 +1,5 @@
 mod config;
+mod container_credentials;
 mod ecs_agent_metadata;
 mod ecs_protocol_client;
 mod ecscape;

