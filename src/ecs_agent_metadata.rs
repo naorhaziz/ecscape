@@ -14,6 +14,7 @@ static ARN_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 #[derive(Debug)]
 pub struct ECSAgentMetadata {
+    pub region: String,
     pub cluster_arn: String,
     pub container_instance_arn: String,
     pub ecs_agent_version: String,
@@ -57,6 +58,7 @@ impl<'de> Deserialize<'de> for ECSAgentMetadata {
         let ecs_agent_hash = caps["hash"].to_string();
 
         Ok(ECSAgentMetadata {
+            region: region.to_string(),
             cluster_arn,
             container_instance_arn: raw.container_instance_arn.to_string(),
             ecs_agent_version,
@@ -67,7 +69,7 @@ impl<'de> Deserialize<'de> for ECSAgentMetadata {
 
 impl ECSAgentMetadata {
     pub async fn try_new(local_ip: &str) -> Result<Self> {
-        let metadata_url = format!("http://{}:51678/v1/metadata", local_ip);
+        let metadata_url = format!("http://{local_ip}:51678/v1/metadata");
         let metadata = reqwest::get(metadata_url).await?.json().await?;
 
         Ok(metadata)

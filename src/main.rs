@@ -9,7 +9,7 @@ mod utils;
 mod ws_client;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use config::{ARCH, VERSION};
 use ecscape::ECSCape;
 use mimalloc::MiMalloc;
@@ -25,6 +25,8 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[derive(Debug, Parser)]
 #[command(arg_required_else_help(true))]
 struct Command {
+    #[arg(long, action = ArgAction::SetTrue)]
+    no_imds: bool,
     #[arg(long)]
     s3_bucket: String,
 }
@@ -41,7 +43,7 @@ async fn main() -> Result<()> {
 
     info!("starting ecscape (version: {}, arch: {})", *VERSION, *ARCH);
 
-    let ecscape = ECSCape::try_new().await?;
+    let ecscape = ECSCape::try_new(opts.no_imds).await?;
 
     let mut interrupt = signal(SignalKind::interrupt())?;
     let mut terminate = signal(SignalKind::terminate())?;
