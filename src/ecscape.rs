@@ -168,38 +168,45 @@ impl ECSCape {
     }
 
     async fn get_acs_url(&self) -> Result<Url> {
-        let poll_endpoint_url = if let Some(imds) = &self.imds_metadata {
-            let ecs_client = ECSClient::new(
-                &SdkConfig::builder()
-                    .credentials_provider(SharedCredentialsProvider::new(Credentials::new(
-                        imds.aws_access_key_id.clone(),
-                        imds.aws_access_secret_key.clone(),
-                        Some(imds.aws_access_token.clone()),
-                        None,
-                        "IMDS",
-                    )))
-                    .region(Region::new(self.ecs_agent_metadata.region.clone()))
-                    .build(),
-            );
-
-            let poll_endpoint = ecs_client
-                .discover_poll_endpoint()
-                .cluster(&self.ecs_agent_metadata.cluster_arn)
-                .container_instance(&self.ecs_agent_metadata.container_instance_arn)
-                .send()
-                .await?;
-
-            poll_endpoint
-                .endpoint()
-                .ok_or(anyhow!("no acs endpoint url"))?
-                .to_string()
+        let (access_key, secret_key, token) = if let Some(imds) = &self.imds_metadata {
+            (
+                imds.aws_access_key_id.clone(),
+                imds.aws_access_secret_key.clone(),
+                imds.aws_access_token.clone(),
+            )
         } else {
-            // fallback if no IMDS
-            let region = &self.ecs_agent_metadata.region;
-            format!("https://ecs-a-11.{}.amazonaws.com", region)
+            (
+                self.container_credentials.access_key_id.clone(),
+                self.container_credentials.secret_access_key.clone(),
+                self.container_credentials.token.clone(),
+            )
         };
 
-        let acs_url = self.build_acs_url(&poll_endpoint_url)?;
+        let ecs_client = ECSClient::new(
+            &SdkConfig::builder()
+                .credentials_provider(SharedCredentialsProvider::new(Credentials::new(
+                    access_key,
+                    secret_key,
+                    Some(token),
+                    None,
+                    "IMDS",
+                )))
+                .region(Region::new(self.ecs_agent_metadata.region.clone()))
+                .build(),
+        );
+
+        let poll_endpoint = ecs_client
+            .discover_poll_endpoint()
+            .cluster(&self.ecs_agent_metadata.cluster_arn)
+            .container_instance(&self.ecs_agent_metadata.container_instance_arn)
+            .send()
+            .await?;
+
+        let poll_endpoint_url = poll_endpoint
+            .endpoint()
+            .ok_or(anyhow!("no acs endpoint url"))?;
+
+        let acs_url = self.build_acs_url(poll_endpoint_url)?;
 
         Ok(acs_url)
     }
