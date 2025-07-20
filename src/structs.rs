@@ -10,6 +10,7 @@ pub enum ProtocolMessage {
     PublishInstanceStatusRequest(PublishInstanceStatusRequest),
     IAMRoleCredentialsMessage(IAMRoleCredentialsMessage),
     IAMRoleCredentialsAckRequest(IAMRoleCredentialsAckRequest),
+    PayloadMessage(PayloadMessage),
     ErrorMessage(ErrorMessage),
     CloseMessage(CloseMessage),
 }
@@ -151,4 +152,17 @@ pub struct IAMRoleCredentialsAckRequest {
     pub message_id: String,
     pub expiration: String,
     pub credentials_id: String,
+}
+
+// Core message that contains tasks with execution role credentials
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PayloadMessage {
+    pub tasks: Vec<Task>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Task {
+    pub execution_role_credentials: Option<IAMRoleCredentials>,
 }
