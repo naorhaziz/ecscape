@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+permissions:
+  packages: write
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,26 +15,23 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cross-rs/cross:latest
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+        target: [ x86_64-unknown-linux-musl, aarch64-unknown-linux-musl ]
     defaults:
       run:
         shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        
+      - name: Set Default Rust Toolchain
+        run: rustup default stable
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm
-          cargo install cross
-
-      - name: Install Rust Target
-        run: |
-          rustup target add ${{ matrix.target }}
-          rustup update
+      - name: Install llvm
+        run: apt-get update && apt-get install -y llvm
 
       - name: Compile
         run: cross build --release --target ${{ matrix.target }}
@@ -39,50 +40,43 @@ jobs:
         run: |
           llvm-strip target/${{ matrix.target }}/release/ecscape
 
-      - name: Upload Built Binary
+      - name: Verify Static Linking
+        run: |
+          file target/${{ matrix.target }}/release/ecscape
+
+      - name: Verify Static Linking with ldd
+        run: |
+          ldd_output=$(ldd target/${{ matrix.target }}/release/ecscape 2>&1 || true)
+          echo "$ldd_output"
+          echo "$ldd_output" | grep -E -q "not a dynamic executable|statically linked" || { echo "Binary is not statically linked!"; exit 1; }
+
+      - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: ecscape-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/ecscape
 
-  docker:
+  upload:
     needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86_64, aarch64]
+        arch: [ x86_64, aarch64 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Download Built Binary
+      - name: Download Binary
         uses: actions/download-artifact@v4
         with:
           name: ecscape-${{ matrix.arch }}-unknown-linux-musl
           path: .
 
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
 
-      - name: Build and Tag Docker Image
-        run: |
-          docker build --platform linux/${{ matrix.arch }} \
-            -t naorhaziz/ecscape:${{ matrix.arch }} \
-            --build-arg ARCH=${{ matrix.arch }} .
+      - name: Build and Tag GHCR Image
+        run: docker build --platform linux/${{ matrix.arch }} -t ghcr.io/${{ github.repository_owner }}/ecscape:latest .
 
-      - name: Push Docker Image
-        run: docker push naorhaziz/ecscape:${{ matrix.arch }}
-
-  manifest:
-    needs: docker
-    runs-on: ubuntu-latest
-    steps:
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-      - name: Create and Push Multi-Arch Manifest
-        run: |
-          docker manifest create naorhaziz/ecscape:latest \
-            --amend naorhaziz/ecscape:x86_64 \
-            --amend naorhaziz/ecscape:aarch64
-          docker manifest push naorhaziz/ecscape:latest
+      - name: Push GHCR Image
+        run: docker push ghcr.io/${{ github.repository_owner }}/ecscape:latest
