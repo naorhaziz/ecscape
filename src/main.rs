@@ -15,6 +15,7 @@ mod config;
 mod ecs_agent_metadata;
 mod ecscape;
 mod imds_metadata;
+mod utils;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
