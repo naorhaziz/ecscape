@@ -11,11 +11,15 @@ use tokio::{
 };
 use tracing::{error, info, warn};
 
+mod acs_client;
+mod acs_connector;
 mod config;
 mod ecs_agent_metadata;
 mod ecscape;
 mod imds_metadata;
+mod structs;
 mod utils;
+mod ws_client;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -40,7 +44,7 @@ async fn main_inner() -> Result<()> {
 
     info!("ecscape started ({}-{})", VERSION.as_str(), ARCH.as_str());
 
-    let ecscape = ECScape::try_new().await?;
+    let ecscape = ECScape::new();
 
     let mut interrupt = signal(SignalKind::interrupt())?;
     let mut terminate = signal(SignalKind::terminate())?;

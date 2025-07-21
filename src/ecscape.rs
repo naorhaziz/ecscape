@@ -1,91 +1,47 @@
-use anyhow::{Result, anyhow};
-use aws_sdk_ecs::{
-    Client as EcsClient,
-    config::{Credentials, SharedCredentialsProvider},
-};
-use aws_types::{SdkConfig, region::Region};
-use tracing::debug;
-use url::Url;
+use crate::acs_client::ACSClient;
+use anyhow::Result;
+use std::time::Duration;
+use tokio_retry2::{Retry, RetryError, strategy::FixedInterval};
+use tracing::{debug, error, info, warn};
 
-use crate::{
-    ecs_agent_metadata::ECSAgentMetadata, imds_metadata::IMDSMetadata, utils::build_ws_url,
-};
-
-pub struct ECScape {
-    imds_metadata: IMDSMetadata,
-    ecs_agent_metadata: ECSAgentMetadata,
-}
+pub struct ECScape {}
 
 impl ECScape {
-    pub async fn try_new() -> Result<Self> {
-        let imds_metadata = IMDSMetadata::try_new().await?;
-        let ecs_agent_metadata = ECSAgentMetadata::try_new(&imds_metadata.local_ip).await?;
-
-        Ok(Self {
-            imds_metadata,
-            ecs_agent_metadata,
-        })
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub async fn obtain_poll_endpoint_url(&self) -> Result<Url> {
-        pub const DOCKER_VERSION: &str = "25.0.6";
-        pub const ACS_PROTOCOL_VERSION: &str = "2";
-        pub const ACS_PROTOCOL_SEC_NUM: &str = "1";
-        pub const ACS_PROTOCOL_SEND_CREDENTIALS: bool = true;
+    async fn start_inner() -> Result<()> {
+        let mut acs_client = ACSClient::connect().await?;
+        debug!("Successfully connected to ACS");
 
-        let credentials = Credentials::new(
-            self.imds_metadata.aws_access_key_id.as_str(),
-            self.imds_metadata.aws_access_secret_key.as_str(),
-            Some(self.imds_metadata.aws_access_token.clone()),
-            None,
-            "IMDS",
-        );
-        let credentials_provider = SharedCredentialsProvider::new(credentials);
-
-        let region = Region::new(self.ecs_agent_metadata.region.clone());
-
-        let sdk_config = SdkConfig::builder()
-            .credentials_provider(credentials_provider)
-            .region(region)
-            .build();
-
-        let ecs_client = EcsClient::new(&sdk_config);
-
-        let discover_poll_endpoint_output = ecs_client
-            .discover_poll_endpoint()
-            .cluster(&self.ecs_agent_metadata.cluster_arn)
-            .container_instance(&self.ecs_agent_metadata.container_instance_arn)
-            .send()
-            .await?;
-
-        let poll_endpoint_url = discover_poll_endpoint_output
-            .endpoint()
-            .ok_or(anyhow!("no acs endpoint url"))?;
-
-        let mut ws_url = build_ws_url(poll_endpoint_url)?;
-        ws_url
-            .query_pairs_mut()
-            .append_pair("agentHash", &self.ecs_agent_metadata.ecs_agent_hash)
-            .append_pair("agentVersion", &self.ecs_agent_metadata.ecs_agent_version)
-            .append_pair("clusterArn", &self.ecs_agent_metadata.cluster_arn)
-            .append_pair(
-                "containerInstanceArn",
-                &self.ecs_agent_metadata.container_instance_arn,
-            )
-            .append_pair("dockerVersion", DOCKER_VERSION)
-            .append_pair("protocolVersion", ACS_PROTOCOL_VERSION)
-            .append_pair("seqNum", ACS_PROTOCOL_SEC_NUM)
-            .append_pair(
-                "sendCredentials",
-                &ACS_PROTOCOL_SEND_CREDENTIALS.to_string(),
-            );
-
-        Ok(ws_url)
+        loop {
+            match acs_client.receive().await {
+                Ok(Some(message)) => {
+                    info!("Received ACS message: {:?}", message);
+                }
+                Ok(None) => {
+                    warn!("ACS connection closed by server");
+                    return Err(anyhow::anyhow!("Connection closed by server"));
+                }
+                Err(err) => {
+                    error!("Failed to receive message from ACS: {:?}", err);
+                    return Err(err);
+                }
+            }
+        }
     }
 
     pub async fn start(&self) -> Result<()> {
-        let poll_endpoint_url = self.obtain_poll_endpoint_url().await?;
-        debug!("ACS Poll Endpoint url: {:?}", poll_endpoint_url);
+        const MAX_RETRIES: usize = 5;
+        const RETRY_DELAY: Duration = Duration::from_secs(5);
+
+        let retry_strategy =
+            FixedInterval::from_millis(RETRY_DELAY.as_millis() as u64).take(MAX_RETRIES);
+        Retry::spawn(retry_strategy, || async {
+            Self::start_inner().await.map_err(RetryError::transient)
+        })
+        .await?;
 
         Ok(())
     }
