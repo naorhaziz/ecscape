@@ -4,42 +4,42 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "message")]
 pub enum ProtocolMessage {
-    HeartbeatMessage(HeartbeatMessage),
-    HeartbeatAckRequest(HeartbeatAckRequest),
-    TaskManifestMessage(TaskManifestMessage),
-    TaskStopVerificationMessage(TaskStopVerificationMessage),
-    TaskStopVerificationAck(TaskStopVerificationAck),
-    PublishMetricsRequest(PublishMetricsRequest),
-    PublishInstanceStatusRequest(PublishInstanceStatusRequest),
-    IAMRoleCredentialsMessage(IAMRoleCredentialsMessage),
-    IAMRoleCredentialsAckRequest(IAMRoleCredentialsAckRequest),
-    RefreshCredentialsMessage(RefreshCredentialsMessage),
-    RefreshCredentialsAckRequest(RefreshCredentialsAckRequest),
-    PayloadMessage(PayloadMessage),
-    AttachTaskNetworkInterfacesMessage(AttachTaskNetworkInterfacesMessage),
-    AttachInstanceNetworkInterfacesMessage(AttachInstanceNetworkInterfacesMessage),
-    ConfirmAttachmentMessage(ConfirmAttachmentMessage),
-    AckRequest(AckRequest),
-    ErrorMessage(ErrorMessage),
-    CloseMessage(CloseMessage),
+    HeartbeatMessage(HeartbeatMessageStruct),
+    HeartbeatAckRequest(HeartbeatAckRequestStruct),
+    TaskManifestMessage(TaskManifestMessageStruct),
+    TaskStopVerificationMessage(TaskStopVerificationMessageStruct),
+    TaskStopVerificationAck(TaskStopVerificationAckStruct),
+    PublishMetricsRequest(PublishMetricsRequestStruct),
+    PublishInstanceStatusRequest(PublishInstanceStatusRequestStruct),
+    IAMRoleCredentialsMessage(IAMRoleCredentialsMessageStruct),
+    IAMRoleCredentialsAckRequest(IAMRoleCredentialsAckRequestStruct),
+    RefreshCredentialsMessage(RefreshCredentialsMessageStruct),
+    RefreshCredentialsAckRequest(RefreshCredentialsAckRequestStruct),
+    PayloadMessage(PayloadMessageStruct),
+    AttachTaskNetworkInterfacesMessage(AttachTaskNetworkInterfacesMessageStruct),
+    AttachInstanceNetworkInterfacesMessage(AttachInstanceNetworkInterfacesMessageStruct),
+    ConfirmAttachmentMessage(ConfirmAttachmentMessageStruct),
+    AckRequest(AckRequestStruct),
+    ErrorMessage(ErrorMessageStruct),
+    CloseMessage(CloseMessageStruct),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct HeartbeatMessage {
+pub struct HeartbeatMessageStruct {
     pub message_id: String,
     pub healthy: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct HeartbeatAckRequest {
+pub struct HeartbeatAckRequestStruct {
     pub message_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct TaskManifestMessage {
+pub struct TaskManifestMessageStruct {
     pub message_id: String,
     pub cluster_arn: String,
     pub container_instance_arn: String,
@@ -49,14 +49,14 @@ pub struct TaskManifestMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct TaskStopVerificationMessage {
+pub struct TaskStopVerificationMessageStruct {
     pub message_id: String,
     pub stop_candidates: Option<Vec<TaskIdentifier>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct TaskStopVerificationAck {
+pub struct TaskStopVerificationAckStruct {
     pub message_id: String,
     pub generated_at: Option<i64>,
     pub stop_tasks: Option<Vec<TaskIdentifier>>,
@@ -93,7 +93,7 @@ pub struct Task {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AttachTaskNetworkInterfacesMessage {
+pub struct AttachTaskNetworkInterfacesMessageStruct {
     pub message_id: String,
     pub cluster_arn: String,
     pub container_instance_arn: String,
@@ -104,7 +104,7 @@ pub struct AttachTaskNetworkInterfacesMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AttachInstanceNetworkInterfacesMessage {
+pub struct AttachInstanceNetworkInterfacesMessageStruct {
     pub message_id: String,
     pub cluster_arn: String,
     pub container_instance_arn: String,
@@ -114,7 +114,7 @@ pub struct AttachInstanceNetworkInterfacesMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AckRequest {
+pub struct AckRequestStruct {
     pub message_id: String,
     pub cluster: String,
     pub container_instance: String,
@@ -130,7 +130,7 @@ pub struct TaskManifestAckRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfirmAttachmentMessage {
+pub struct ConfirmAttachmentMessageStruct {
     pub message_id: String,
     pub cluster_arn: String,
     pub container_instance_arn: String,
@@ -331,7 +331,7 @@ pub struct FSxWindowsFileServerAuthorizationConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct PayloadMessage {
+pub struct PayloadMessageStruct {
     pub message_id: String,             // Required - validated as non-empty
     pub cluster_arn: String,            // Required - validated as non-empty
     pub container_instance_arn: String, // Required - validated as non-empty
@@ -342,7 +342,7 @@ pub struct PayloadMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct PublishMetricsRequest {
+pub struct PublishMetricsRequestStruct {
     pub message_id: String,
     pub timestamp: Option<i64>,
     pub task_arn: Option<String>,
@@ -364,7 +364,7 @@ pub struct TaskMetric {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct PublishInstanceStatusRequest {
+pub struct PublishInstanceStatusRequestStruct {
     pub message_id: String,
     pub container_instance_arn: Option<String>,
     pub status: Option<String>,
@@ -386,7 +386,7 @@ pub struct Resource {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct IAMRoleCredentialsMessage {
+pub struct IAMRoleCredentialsMessageStruct {
     pub message_id: String,
     pub task_arn: Option<String>,
     pub role_type: Option<String>,
@@ -395,7 +395,7 @@ pub struct IAMRoleCredentialsMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct RefreshCredentialsMessage {
+pub struct RefreshCredentialsMessageStruct {
     pub message_id: String,
     pub task_arn: Option<String>,
     pub role_type: Option<String>,
@@ -404,7 +404,7 @@ pub struct RefreshCredentialsMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct RefreshCredentialsAckRequest {
+pub struct RefreshCredentialsAckRequestStruct {
     pub message_id: String,
     pub task_arn: Option<String>,
     pub expiration: Option<String>,
@@ -424,7 +424,7 @@ pub struct IAMRoleCredentials {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct IAMRoleCredentialsAckRequest {
+pub struct IAMRoleCredentialsAckRequestStruct {
     pub message_id: String,
     pub expiration: Option<String>,
     pub credentials_id: Option<String>,
@@ -458,7 +458,7 @@ pub struct Network {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ErrorMessage {
+pub struct ErrorMessageStruct {
     pub message_id: String,
     pub error_type: Option<String>,
     pub error_message: Option<String>,
@@ -466,7 +466,7 @@ pub struct ErrorMessage {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct CloseMessage {
+pub struct CloseMessageStruct {
     pub message_id: String,
     pub reason: Option<String>,
 }

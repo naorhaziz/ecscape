@@ -1,11 +1,14 @@
-use crate::acs_client::ACSClient;
+use crate::{
+    acs_client::ACSClient,
+    structs::{HeartbeatAckRequestStruct, ProtocolMessage},
+};
 use anyhow::Result;
 use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 use tokio_retry2::{Retry, RetryError, strategy::FixedInterval};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 pub struct ECScape {}
 
@@ -21,7 +24,10 @@ impl ECScape {
         loop {
             match acs_client.receive().await {
                 Ok(Some(message)) => {
-                    info!("Received ACS message: {:?}", message);
+                    if let Err(err) = Self::handle_message(&mut acs_client, &message).await {
+                        warn!("Failed to handle ACS message: {:?}", err);
+                        return Err(err);
+                    }
                 }
                 Ok(None) => {
                     warn!("ACS connection closed by server");
@@ -48,6 +54,29 @@ impl ECScape {
                 .map_err(RetryError::transient)
         })
         .await?;
+
+        Ok(())
+    }
+
+    async fn handle_message(acs_client: &mut ACSClient, message: &ProtocolMessage) -> Result<()> {
+        match message {
+            ProtocolMessage::HeartbeatMessage(msg) => {
+                debug!("Processing HeartbeatMessage with ID: {}", msg.message_id);
+                let heartbeat_ack = HeartbeatAckRequestStruct {
+                    message_id: msg.message_id.clone(),
+                };
+                let ack_message = ProtocolMessage::HeartbeatAckRequest(heartbeat_ack);
+                acs_client.send(&ack_message).await?;
+                debug!(
+                    "Sent HeartbeatAckRequest for message ID: {}",
+                    msg.message_id
+                );
+            }
+
+            _ => {
+                debug!("Received ACS message: {:?}", message);
+            }
+        }
 
         Ok(())
     }
