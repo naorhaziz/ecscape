@@ -26,11 +26,14 @@ impl ACSConnector {
         })
     }
 
-    pub async fn obtain_poll_endpoint_url(&self, credentials: Credentials) -> Result<Url> {
+    pub async fn obtain_poll_endpoint_url(
+        &self,
+        send_credentials: bool,
+        credentials: Credentials,
+    ) -> Result<Url> {
         pub const DOCKER_VERSION: &str = "25.0.6";
         pub const ACS_PROTOCOL_VERSION: &str = "2";
         pub const ACS_PROTOCOL_SEC_NUM: &str = "1";
-        pub const ACS_PROTOCOL_SEND_CREDENTIALS: bool = true;
 
         let credentials_provider = SharedCredentialsProvider::new(credentials);
 
@@ -67,15 +70,12 @@ impl ACSConnector {
             .append_pair("dockerVersion", DOCKER_VERSION)
             .append_pair("protocolVersion", ACS_PROTOCOL_VERSION)
             .append_pair("seqNum", ACS_PROTOCOL_SEC_NUM)
-            .append_pair(
-                "sendCredentials",
-                &ACS_PROTOCOL_SEND_CREDENTIALS.to_string(),
-            );
+            .append_pair("sendCredentials", &send_credentials.to_string());
 
         Ok(ws_url)
     }
 
-    pub async fn connect(&self) -> Result<WSClient> {
+    pub async fn connect(&self, send_credentials: bool) -> Result<WSClient> {
         let credentials = Credentials::new(
             self.imds_metadata.aws_access_key_id.as_str(),
             self.imds_metadata.aws_access_secret_key.as_str(),
@@ -84,7 +84,9 @@ impl ACSConnector {
             "IMDS",
         );
 
-        let poll_endpoint_url = self.obtain_poll_endpoint_url(credentials.clone()).await?;
+        let poll_endpoint_url = self
+            .obtain_poll_endpoint_url(send_credentials, credentials.clone())
+            .await?;
         debug!("ACS Poll Endpoint url: {:?}", poll_endpoint_url);
 
         let ws_client = WSClient::connect_with_sigv4(
