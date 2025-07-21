@@ -75,6 +75,10 @@ async fn async_main() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install rustls crypto provider");
+
     const MAX_THREADS: usize = 8;
 
     let worker_threads = thread::available_parallelism()
