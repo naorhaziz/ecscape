@@ -203,7 +203,7 @@ resource "aws_ecs_task_definition" "ecscape_task" {
   container_definitions = jsonencode([
     {
       name       = "ecscape"
-      image      = "naorhaziz/ecscape:latest"
+      image      = "ghcr.io/naorhaziz/ecscape:latest"
       entryPoint = ["sleep", "infinity"]
       essential  = true
       memory     = 512
