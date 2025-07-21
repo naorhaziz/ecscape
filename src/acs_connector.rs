@@ -31,7 +31,7 @@ impl ACSConnector {
         send_credentials: bool,
         credentials: Credentials,
     ) -> Result<Url> {
-        pub const DOCKER_VERSION: &str = "25.0.6";
+        pub const DOCKER_VERSION: &str = "25.0.8";
         pub const ACS_PROTOCOL_VERSION: &str = "2";
         pub const ACS_PROTOCOL_SEC_NUM: &str = "1";
 

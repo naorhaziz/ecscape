@@ -45,7 +45,7 @@ impl ECScape {
     }
 
     pub async fn start(&self) -> Result<()> {
-        const RETRY_DELAY: Duration = Duration::from_secs(5);
+        const RETRY_DELAY: Duration = Duration::from_millis(100);
 
         let retry_strategy = FixedInterval::from_millis(RETRY_DELAY.as_millis() as u64);
 
