@@ -210,9 +210,9 @@ pub struct Container {
     pub known_status: Option<String>,
     pub exit_code: Option<i32>,
     pub reason: Option<String>,
-    pub created_at: Option<String>,
-    pub started_at: Option<String>,
-    pub finished_at: Option<String>,
+    pub created_at: Option<i64>,
+    pub started_at: Option<i64>,
+    pub finished_at: Option<i64>,
     pub networks: Option<Vec<Network>>,
     pub links: Option<Vec<String>>,
     pub essential: Option<bool>,
@@ -336,7 +336,7 @@ pub struct PayloadMessage {
     pub cluster_arn: String,            // Required - validated as non-empty
     pub container_instance_arn: String, // Required - validated as non-empty
     pub tasks: Option<Vec<Task>>,
-    pub generated_at: Option<String>,
+    pub generated_at: Option<i64>,
     pub seq_num: Option<i64>,
 }
 
@@ -344,7 +344,7 @@ pub struct PayloadMessage {
 #[serde(rename_all = "camelCase")]
 pub struct PublishMetricsRequest {
     pub message_id: String,
-    pub timestamp: Option<String>,
+    pub timestamp: Option<i64>,
     pub task_arn: Option<String>,
     pub metrics: Option<Vec<TaskMetric>>,
 }
