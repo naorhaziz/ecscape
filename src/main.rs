@@ -34,7 +34,7 @@ struct Args {
 async fn main_inner() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let args = match Args::try_parse() {
+    let _args = match Args::try_parse() {
         Ok(args) => args,
         Err(err) => {
             error!("Failed to parse command line arguments: {:?}", err);
@@ -75,11 +75,11 @@ async fn async_main() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    const MAX_THREADS: usize = 8;
+
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("failed to install rustls crypto provider");
-
-    const MAX_THREADS: usize = 8;
 
     let worker_threads = thread::available_parallelism()
         .map(|o| o.get())

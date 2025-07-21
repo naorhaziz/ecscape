@@ -62,7 +62,7 @@ pub struct TaskStopVerificationAckStruct {
     pub stop_tasks: Option<Vec<TaskIdentifier>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskIdentifier {
     pub task_arn: Option<String>,
