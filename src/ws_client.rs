@@ -125,6 +125,7 @@ impl WSClient {
                 msg = write_rx.recv() => {
                     match msg {
                         Some(msg) => {
+                            debug!("Sending message: {:?}", msg);
                             sink.send(Message::Text(msg.into())).await?;
                         }
                         None => {

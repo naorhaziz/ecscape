@@ -31,9 +31,12 @@ impl ACSConnector {
         send_credentials: bool,
         credentials: Credentials,
     ) -> Result<Url> {
-        pub const DOCKER_VERSION: &str = "25.0.8";
-        pub const ACS_PROTOCOL_VERSION: &str = "2";
+        // ACS protocol version spec:
+        // 1: default protocol version
+        // 2: ACS will proactively close the connection when heartbeat ACKs are missing
+        pub const ACS_PROTOCOL_VERSION: &str = "1";
         pub const ACS_PROTOCOL_SEC_NUM: &str = "1";
+        pub const DOCKER_VERSION: &str = "25.0.8";
 
         let credentials_provider = SharedCredentialsProvider::new(credentials);
 
