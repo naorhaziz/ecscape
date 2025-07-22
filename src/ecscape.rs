@@ -10,7 +10,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use tokio_retry2::{Retry, RetryError, strategy::FixedInterval};
+use tokio_retry2::{Retry, RetryError, strategy::ExponentialBackoff};
 use tracing::{debug, error, info, warn};
 
 pub struct ECScape {}
@@ -45,9 +45,15 @@ impl ECScape {
     }
 
     pub async fn start(&self) -> Result<()> {
-        const RETRY_DELAY: Duration = Duration::from_millis(100);
+        // Official ECS Agent reconnection timing constants
+        const CONNECTION_BACKOFF_MIN: Duration = Duration::from_millis(250);
+        const CONNECTION_BACKOFF_MAX: Duration = Duration::from_secs(120);
+        const CONNECTION_BACKOFF_MULTIPLIER: u64 = 2;
 
-        let retry_strategy = FixedInterval::from_millis(RETRY_DELAY.as_millis() as u64);
+        let retry_strategy =
+            ExponentialBackoff::from_millis(CONNECTION_BACKOFF_MIN.as_millis() as u64)
+                .max_delay(CONNECTION_BACKOFF_MAX)
+                .factor(CONNECTION_BACKOFF_MULTIPLIER);
 
         let first_attempt = AtomicBool::new(true);
         Retry::spawn(retry_strategy, || async {
