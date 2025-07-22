@@ -1,5 +1,6 @@
 use crate::{
     acs_client::ACSClient,
+    ecs_container_instance_registrator::ECSContainerInstanceRegistrator,
     structs::{
         AckRequestStruct, HeartbeatAckRequestStruct, IAMRoleCredentialsAckRequestStruct,
         ProtocolMessage, RefreshCredentialsAckRequestStruct, TaskStopVerificationAckStruct,
@@ -13,11 +14,17 @@ use std::{
 use tokio_retry2::{Retry, RetryError, strategy::ExponentialBackoff};
 use tracing::{debug, error, info, warn};
 
-pub struct ECScape {}
+pub struct ECScape {
+    container_instance_registrator: ECSContainerInstanceRegistrator,
+}
 
 impl ECScape {
-    pub fn new() -> Self {
-        Self {}
+    pub async fn try_new() -> Result<Self> {
+        let container_instance_registrator = ECSContainerInstanceRegistrator::try_new().await?;
+
+        Ok(Self {
+            container_instance_registrator,
+        })
     }
 
     async fn start_inner(send_credentials: bool) -> Result<()> {
