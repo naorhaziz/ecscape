@@ -29,6 +29,7 @@ impl ACSConnector {
     pub async fn obtain_poll_endpoint_url(
         &self,
         send_credentials: bool,
+        container_instance_arn: String,
         credentials: Credentials,
     ) -> Result<Url> {
         // ACS protocol version spec:
@@ -51,7 +52,7 @@ impl ACSConnector {
         let discover_poll_endpoint_output = ecs_client
             .discover_poll_endpoint()
             .cluster(&self.ecs_agent_metadata.cluster_arn)
-            .container_instance(&self.ecs_agent_metadata.container_instance_arn)
+            .container_instance(&container_instance_arn)
             .send()
             .await?;
 
@@ -65,10 +66,7 @@ impl ACSConnector {
             .append_pair("agentHash", &self.ecs_agent_metadata.ecs_agent_hash)
             .append_pair("agentVersion", &self.ecs_agent_metadata.ecs_agent_version)
             .append_pair("clusterArn", &self.ecs_agent_metadata.cluster_arn)
-            .append_pair(
-                "containerInstanceArn",
-                &self.ecs_agent_metadata.container_instance_arn,
-            )
+            .append_pair("containerInstanceArn", &container_instance_arn)
             .append_pair("protocolVersion", ACS_PROTOCOL_VERSION)
             .append_pair("seqNum", ACS_PROTOCOL_SEC_NUM)
             .append_pair("sendCredentials", &send_credentials.to_string());
@@ -76,7 +74,11 @@ impl ACSConnector {
         Ok(ws_url)
     }
 
-    pub async fn connect(&self, send_credentials: bool) -> Result<WSClient> {
+    pub async fn connect(
+        &self,
+        send_credentials: bool,
+        container_instance_arn: String,
+    ) -> Result<WSClient> {
         let credentials = Credentials::new(
             self.imds_metadata.aws_access_key_id.as_str(),
             self.imds_metadata.aws_access_secret_key.as_str(),
@@ -86,7 +88,11 @@ impl ACSConnector {
         );
 
         let poll_endpoint_url = self
-            .obtain_poll_endpoint_url(send_credentials, credentials.clone())
+            .obtain_poll_endpoint_url(
+                send_credentials,
+                container_instance_arn,
+                credentials.clone(),
+            )
             .await?;
         debug!("ACS Poll Endpoint url: {:?}", poll_endpoint_url);
 

@@ -27,8 +27,8 @@ impl ECScape {
         })
     }
 
-    async fn start_inner(send_credentials: bool) -> Result<()> {
-        let mut acs_client = ACSClient::connect(send_credentials).await?;
+    async fn start_inner(send_credentials: bool, container_instance_arn: String) -> Result<()> {
+        let mut acs_client = ACSClient::connect(send_credentials, container_instance_arn).await?;
         debug!("Successfully connected to ACS");
 
         loop {
@@ -65,9 +65,14 @@ impl ECScape {
         let first_attempt = AtomicBool::new(true);
         Retry::spawn(retry_strategy, || async {
             let send_credentials = first_attempt.swap(false, Ordering::Relaxed);
-            Self::start_inner(send_credentials)
-                .await
-                .map_err(RetryError::transient)
+            Self::start_inner(
+                send_credentials,
+                self.container_instance_registrator
+                    .container_instance_arn()
+                    .to_string(),
+            )
+            .await
+            .map_err(RetryError::transient)
         })
         .await?;
 

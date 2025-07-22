@@ -8,9 +8,11 @@ pub struct ACSClient {
 }
 
 impl ACSClient {
-    pub async fn connect(send_credentials: bool) -> Result<Self> {
+    pub async fn connect(send_credentials: bool, container_instance_arn: String) -> Result<Self> {
         let acs_connector = ACSConnector::try_new().await?;
-        let ws_client = acs_connector.connect(send_credentials).await?;
+        let ws_client = acs_connector
+            .connect(send_credentials, container_instance_arn)
+            .await?;
 
         Ok(Self { ws_client })
     }
