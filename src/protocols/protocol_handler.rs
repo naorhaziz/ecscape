@@ -1,41 +1,38 @@
-pub mod acs_handler;
-pub mod tcs_handler;
-
-use crate::protocols::{ecs_protocol_client::ECSProtocolClient, structs::ProtocolMessage};
+use crate::protocols::protocol_client::ProtocolClient;
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Serialize, de::DeserializeOwned};
 use std::time::Duration;
 use tokio_retry2::{Retry, RetryError, strategy::ExponentialBackoff};
 use tokio_tungstenite::tungstenite::http::Request;
 use tracing::{error, warn};
 
 #[async_trait]
-pub trait ECSProtocolHandler: Send + Sync {
+pub trait ProtocolHandler<T>: Send + Sync
+where
+    T: Serialize + DeserializeOwned + Send,
+{
     fn build_request(&self) -> Result<Request<()>>;
-    async fn handle_message(
-        &self,
-        ecs_protocol_client: &mut ECSProtocolClient,
-        message: ProtocolMessage,
-    ) -> Result<()>;
+    async fn handle_message(&self, client: &mut ProtocolClient<T>, message: T) -> Result<()>;
 
     async fn start_inner(&self) -> Result<()> {
         let request = self.build_request()?;
-        let mut ecs_protocol_client = ECSProtocolClient::connect(request).await?;
+        let mut client = ProtocolClient::<T>::connect(request).await?;
 
         loop {
-            match ecs_protocol_client.receive().await {
+            match client.receive().await {
                 Ok(Some(message)) => {
-                    if let Err(err) = self.handle_message(&mut ecs_protocol_client, message).await {
-                        warn!("Failed to handle ECS message: {:?}", err);
+                    if let Err(err) = self.handle_message(&mut client, message).await {
+                        warn!("Failed to handle message: {:?}", err);
                         return Err(err);
                     }
                 }
                 Ok(None) => {
-                    warn!("ECS connection closed by server");
-                    return Err(anyhow::anyhow!("Connection closed by server"));
+                    warn!("WebSocket connection closed by peer");
+                    return Err(anyhow::anyhow!("WebSocket connection closed"));
                 }
                 Err(err) => {
-                    error!("Failed to receive message from ECS: {:?}", err);
+                    error!("Failed to receive message: {:?}", err);
                     return Err(err);
                 }
             }

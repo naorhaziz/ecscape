@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "message")]
-pub enum ProtocolMessage {
+pub enum ACSMessage {
     HeartbeatMessage(HeartbeatMessageStruct),
     HeartbeatAckRequest(HeartbeatAckRequestStruct),
     TaskManifestMessage(TaskManifestMessageStruct),

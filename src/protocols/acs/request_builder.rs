@@ -1,8 +1,9 @@
-use crate::protocols::request_builders::RequestBuilder;
 use anyhow::{Result, anyhow};
 use aws_sdk_ecs::operation::discover_poll_endpoint::DiscoverPollEndpointOutput;
 use std::sync::atomic::{AtomicBool, Ordering};
 use url::Url;
+
+use crate::protocols::request_builder::RequestBuilder;
 
 pub struct ACSRequestBuilder {
     send_credentials: AtomicBool,

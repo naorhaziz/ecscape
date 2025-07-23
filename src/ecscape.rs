@@ -2,7 +2,7 @@ use crate::{
     ecs_agent_metadata::ECSAgentMetadata,
     ecs_container_instance_registrator::ECSContainerInstanceRegistrator,
     imds_metadata::IMDSMetadata,
-    protocols::handlers::{ECSProtocolHandler, acs_handler::ACSHandler, tcs_handler::TCSHandler},
+    protocols::{acs::handler::ACSHandler, protocol_handler::ProtocolHandler},
 };
 use anyhow::Result;
 use aws_credential_types::Credentials;
@@ -67,22 +67,22 @@ impl ECScape {
             self.ecs_agent_metadata.ecs_agent_hash.clone(),
         );
 
-        // Create TCS handler
-        let tcs_handler = TCSHandler::new(
-            credentials,
-            discover_poll_endpoint_output,
-            self.ecs_agent_metadata.region.clone(),
-            self.ecs_agent_metadata.cluster_arn.clone(),
-            self.container_instance_registrator
-                .container_instance_arn()
-                .to_string(),
-            self.ecs_agent_metadata.ecs_agent_version.clone(),
-            self.ecs_agent_metadata.ecs_agent_hash.clone(),
-        );
+        // // Create TCS handler
+        // let tcs_handler = TCSHandler::new(
+        //     credentials,
+        //     discover_poll_endpoint_output,
+        //     self.ecs_agent_metadata.region.clone(),
+        //     self.ecs_agent_metadata.cluster_arn.clone(),
+        //     self.container_instance_registrator
+        //         .container_instance_arn()
+        //         .to_string(),
+        //     self.ecs_agent_metadata.ecs_agent_version.clone(),
+        //     self.ecs_agent_metadata.ecs_agent_hash.clone(),
+        // );
 
         select! {
             res = acs_handler.start() => res,
-            res = tcs_handler.start() => res,
+            // res = tcs_handler.start() => res,
         }
     }
 }
