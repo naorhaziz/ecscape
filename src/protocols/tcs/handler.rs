@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use aws_credential_types::Credentials;
 use aws_sdk_ecs::operation::discover_poll_endpoint::DiscoverPollEndpointOutput;
+use sysinfo::{Disks, System};
 use tokio::{select, time};
 use tokio_tungstenite::tungstenite::http::Request;
 use tracing::{debug, error, info, warn};
@@ -147,18 +148,64 @@ impl TCSHandler {
             .unwrap()
             .as_secs() as i64;
 
-        // Create basic instance storage metrics
+        // Get real system metrics using sysinfo directly
+        let mut system = System::new_all();
+        system.refresh_all();
+
+        // Get filesystem usage as a percentage (0.0 to 100.0)
+        let mut root_usage = 0.0;
+        let mut data_usage = 0.0;
+
+        let disks = Disks::new_with_refreshed_list();
+
+        for disk in &disks {
+            let mount_point = disk.mount_point().to_string_lossy();
+            let total_space = disk.total_space();
+            let available_space = disk.available_space();
+
+            if total_space > 0 {
+                let used_space = total_space - available_space;
+                let usage_percent = (used_space as f64 / total_space as f64) * 100.0;
+
+                // Map mount points to usage types
+                if mount_point == "/" {
+                    root_usage = usage_percent;
+                } else if mount_point.contains("/data") || mount_point.contains("/var/lib/docker") {
+                    data_usage = usage_percent;
+                } else if root_usage == 0.0 {
+                    // If we haven't found root yet, use the first significant disk
+                    root_usage = usage_percent;
+                }
+            }
+        }
+
+        // If we only found one filesystem, use it for both
+        if data_usage == 0.0 && root_usage > 0.0 {
+            data_usage = root_usage;
+        }
+
+        // Get CPU and memory usage
+        let cpu_usage = system.global_cpu_usage() as f64;
+        let total_memory = system.total_memory();
+        let used_memory = system.used_memory();
+        let memory_usage = if total_memory > 0 {
+            (used_memory as f64 / total_memory as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Check if the system appears to be idle (low resource usage)
+        let is_idle = cpu_usage < 5.0 && memory_usage < 50.0;
+
+        // Create instance storage metrics with real data
         let instance_storage_metrics = InstanceStorageMetrics {
-            data_filesystem: Some(0.0), // Placeholder - should be real disk usage
-            root_filesystem: Some(0.0), // Placeholder - should be real disk usage
+            data_filesystem: Some(data_usage),
+            root_filesystem: Some(root_usage),
         };
 
         let instance_metrics = InstanceMetrics {
             storage: Some(instance_storage_metrics),
         };
-
-        // Detect if instance is idle (no tasks running)
-        let is_idle = true; // TODO: Implement actual idle detection based on running tasks
 
         let metadata = MetricsMetadata {
             cluster: Some(self.cluster_arn.clone()),
@@ -188,9 +235,19 @@ impl TCSHandler {
         };
 
         let message = TCSMessage::PublishMetricsRequest(publish_request);
+
+        // Debug: Log the message being sent
+        debug!(
+            "Sending TCS metrics message: {:?}",
+            serde_json::to_string(&message).unwrap_or_else(|_| "Failed to serialize".to_string())
+        );
+
         client.send(&message).await?;
 
-        debug!("Published metrics to TCS (idle: {})", is_idle);
+        debug!(
+            "Published metrics to TCS (idle: {}, CPU: {:.1}%, Memory: {:.1}%, Root FS: {:.1}%, Data FS: {:.1}%)",
+            is_idle, cpu_usage, memory_usage, root_usage, data_usage
+        );
         Ok(())
     }
 
@@ -214,6 +271,13 @@ impl TCSHandler {
         };
 
         let message = TCSMessage::PublishHealthRequest(publish_request);
+
+        // Debug: Log the message being sent
+        debug!(
+            "Sending TCS health message: {:?}",
+            serde_json::to_string(&message).unwrap_or_else(|_| "Failed to serialize".to_string())
+        );
+
         client.send(&message).await?;
 
         debug!("Published health to TCS");
@@ -239,6 +303,13 @@ impl TCSHandler {
         };
 
         let message = TCSMessage::PublishInstanceStatusRequest(publish_request);
+
+        // Debug: Log the message being sent
+        debug!(
+            "Sending TCS instance status message: {:?}",
+            serde_json::to_string(&message).unwrap_or_else(|_| "Failed to serialize".to_string())
+        );
+
         client.send(&message).await?;
 
         debug!("Published instance status to TCS");
