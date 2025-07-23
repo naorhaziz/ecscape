@@ -89,7 +89,7 @@ impl WSClient {
         Ok(())
     }
 
-    pub async fn send(&mut self, message: String) -> Result<()> {
+    pub async fn send(&self, message: String) -> Result<()> {
         // Check if the writer task is still running
         if self.join_writer.is_finished() {
             return Err(anyhow!(

@@ -1,4 +1,4 @@
-use crate::protocols::request_builders::RequestBuilder;
+use crate::protocols::request_builder::RequestBuilder;
 use anyhow::{Result, anyhow};
 use aws_sdk_ecs::operation::discover_poll_endpoint::DiscoverPollEndpointOutput;
 use url::Url;
@@ -8,18 +8,6 @@ pub struct TCSRequestBuilder {}
 impl TCSRequestBuilder {
     pub fn new() -> Self {
         Self {}
-    }
-
-    pub fn build_ws_url(url: &str) -> Result<Url> {
-        let mut url = Url::parse(url)?;
-
-        if !url.path().ends_with('/') {
-            url.set_path(&format!("{}/ws", url.path()));
-        } else {
-            url.set_path(&format!("{}ws", url.path()));
-        }
-
-        Ok(url)
     }
 }
 

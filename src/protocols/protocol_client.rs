@@ -21,7 +21,7 @@ where
         })
     }
 
-    pub async fn send(&mut self, message: &T) -> Result<()> {
+    pub async fn send(&self, message: &T) -> Result<()> {
         self.ws_client.send(serde_json::to_string(message)?).await
     }
 

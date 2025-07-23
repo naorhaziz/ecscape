@@ -17,7 +17,7 @@ use aws_credential_types::Credentials;
 use aws_sdk_ecs::operation::discover_poll_endpoint::DiscoverPollEndpointOutput;
 use chrono;
 use tokio_tungstenite::tungstenite::http::Request;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct ACSHandler {
     request_builder: ACSRequestBuilder,
@@ -50,21 +50,6 @@ impl ACSHandler {
             agent_version,
             agent_hash,
         }
-    }
-}
-
-#[async_trait]
-impl ProtocolHandler<ACSMessage> for ACSHandler {
-    fn build_request(&self) -> Result<Request<()>> {
-        self.request_builder.build_request(
-            self.credentials.clone(),
-            self.discover_poll_endpoint_output.clone(),
-            &self.region,
-            &self.cluster_arn,
-            &self.container_instance_arn,
-            &self.agent_version,
-            &self.agent_hash,
-        )
     }
 
     async fn handle_message(
@@ -271,5 +256,41 @@ impl ProtocolHandler<ACSMessage> for ACSHandler {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ProtocolHandler<ACSMessage> for ACSHandler {
+    fn build_request(&self) -> Result<Request<()>> {
+        self.request_builder.build_request(
+            self.credentials.clone(),
+            self.discover_poll_endpoint_output.clone(),
+            &self.region,
+            &self.cluster_arn,
+            &self.container_instance_arn,
+            &self.agent_version,
+            &self.agent_hash,
+        )
+    }
+
+    async fn start_inner(&self, mut client: ProtocolClient<ACSMessage>) -> Result<()> {
+        loop {
+            match client.receive().await {
+                Ok(Some(message)) => {
+                    if let Err(err) = self.handle_message(&mut client, message).await {
+                        warn!("Failed to handle message: {:?}", err);
+                        return Err(err);
+                    }
+                }
+                Ok(None) => {
+                    warn!("WebSocket connection closed by peer");
+                    return Err(anyhow::anyhow!("WebSocket connection closed"));
+                }
+                Err(err) => {
+                    error!("Failed to receive message: {:?}", err);
+                    return Err(err);
+                }
+            }
+        }
     }
 }
