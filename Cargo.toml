@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+async-trait = "0.1.88"
 aws-credential-types = "1.2.4"
 aws-sdk-ecs = { version = "1.89.0", features = [
     "behavior-version-latest",

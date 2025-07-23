@@ -11,15 +11,12 @@ use tokio::{
 };
 use tracing::{error, info, warn};
 
-mod acs_client;
-mod acs_connector;
 mod config;
 mod ecs_agent_metadata;
 mod ecs_container_instance_registrator;
 mod ecscape;
 mod imds_metadata;
-mod structs;
-mod utils;
+mod protocols;
 mod ws_client;
 
 #[global_allocator]

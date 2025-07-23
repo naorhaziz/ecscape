@@ -1,14 +1,9 @@
 use anyhow::{Result, anyhow};
-use aws_credential_types::Credentials;
-use aws_sigv4::{
-    http_request::{SignableBody, SignableRequest, SigningSettings, sign},
-    sign::v4::SigningParams,
-};
 use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::{
     net::TcpStream,
     select,
@@ -20,13 +15,9 @@ use tokio::{
 };
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
-    tungstenite::{
-        Message,
-        http::{Method, Request},
-    },
+    tungstenite::{Message, http::Request},
 };
 use tracing::{debug, warn};
-use url::Url;
 
 pub struct WSClient {
     write_tx: UnboundedSender<String>,
@@ -36,13 +27,7 @@ pub struct WSClient {
 }
 
 impl WSClient {
-    pub async fn connect_with_sigv4(
-        url: Url,
-        aws_region: &str,
-        credentials: Credentials,
-    ) -> Result<Self> {
-        let request = Self::build_request(url, aws_region, credentials)?;
-
+    pub async fn connect(request: Request<()>) -> Result<Self> {
         let (ws_stream, response) = connect_async(request).await?;
         if response.status() != 101 {
             return Err(anyhow!(
@@ -63,45 +48,6 @@ impl WSClient {
             join_writer,
             reader: stream,
         })
-    }
-
-    fn build_request(url: Url, aws_region: &str, credentials: Credentials) -> Result<Request<()>> {
-        let signable_request = SignableRequest::new(
-            "GET",
-            url.as_str(),
-            std::iter::empty(),
-            SignableBody::Bytes(&[]),
-        )?;
-
-        let identity = credentials.into();
-
-        let signing_params = SigningParams::builder()
-            .identity(&identity)
-            .region(aws_region)
-            .name("ecs")
-            .time(SystemTime::now())
-            .settings(SigningSettings::default())
-            .build()?
-            .into();
-
-        let (signing_instructions, _signature) =
-            sign(signable_request, &signing_params)?.into_parts();
-
-        let mut request = Request::builder()
-            .method(Method::GET)
-            .uri(url.as_str())
-            .header("Host", url.host_str().ok_or(anyhow!("Missing host"))?)
-            .header("Upgrade", "websocket")
-            .header("Connection", "Upgrade")
-            .header(
-                "Sec-WebSocket-Key",
-                tokio_tungstenite::tungstenite::handshake::client::generate_key(),
-            )
-            .header("Sec-WebSocket-Version", "13")
-            .body(())?;
-        signing_instructions.apply_to_request_http1x(&mut request);
-
-        Ok(request)
     }
 
     async fn writer_task(

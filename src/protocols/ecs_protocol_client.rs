@@ -1,19 +1,15 @@
+use crate::{protocols::structs::ProtocolMessage, ws_client::WSClient};
 use anyhow::Result;
 use serde_json;
+use tokio_tungstenite::tungstenite::http::Request;
 
-use crate::{acs_connector::ACSConnector, structs::ProtocolMessage, ws_client::WSClient};
-
-pub struct ACSClient {
+pub struct ECSProtocolClient {
     ws_client: WSClient,
 }
 
-impl ACSClient {
-    pub async fn connect(send_credentials: bool, container_instance_arn: String) -> Result<Self> {
-        let acs_connector = ACSConnector::try_new().await?;
-        let ws_client = acs_connector
-            .connect(send_credentials, container_instance_arn)
-            .await?;
-
+impl ECSProtocolClient {
+    pub async fn connect(request: Request<()>) -> Result<Self> {
+        let ws_client = WSClient::connect(request).await?;
         Ok(Self { ws_client })
     }
 
