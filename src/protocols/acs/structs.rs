@@ -170,9 +170,9 @@ pub struct RefreshCredentialsAckRequestStruct {
 #[serde(rename_all = "camelCase")]
 pub struct IAMRoleCredentials {
     pub credentials_id: Option<String>,
-    pub access_key_id: Option<String>,
-    pub secret_access_key: Option<String>,
-    pub session_token: Option<String>,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub session_token: String,
     pub role_arn: Option<String>,
     pub expiration: Option<String>,
 }

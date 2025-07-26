@@ -1,6 +1,6 @@
 use crate::{
+    credentials_reactors::ECScapeCredentials,
     ecs_agent_metadata::ECSAgentMetadata,
-    ecs_container_instance_registrator::ECSContainerInstanceRegistrator,
     imds_metadata::IMDSMetadata,
     protocols::{acs::handler::ACSHandler, protocol_handler::ProtocolHandler},
 };
@@ -8,34 +8,25 @@ use anyhow::Result;
 use aws_credential_types::Credentials;
 use aws_sdk_ecs::{Client as EcsClient, config::SharedCredentialsProvider};
 use aws_types::{SdkConfig, region::Region};
-use tokio::select;
-use tracing::info;
+use tokio::{select, sync::broadcast::Sender};
 
 pub struct ECScape {
     imds_metadata: IMDSMetadata,
     ecs_agent_metadata: ECSAgentMetadata,
-    // container_instance_registrator: ECSContainerInstanceRegistrator,
 }
 
 impl ECScape {
     pub async fn try_new() -> Result<Self> {
         let imds_metadata = IMDSMetadata::try_new().await?;
         let ecs_agent_metadata = ECSAgentMetadata::try_new(&imds_metadata.local_ip).await?;
-        // let container_instance_registrator = ECSContainerInstanceRegistrator::try_new().await?;
-
-        // info!(
-        //     "Registering ECS container instance: {}",
-        //     container_instance_registrator.container_instance_arn()
-        // );
 
         Ok(Self {
             imds_metadata,
             ecs_agent_metadata,
-            // container_instance_registrator,
         })
     }
 
-    pub async fn start(&self) -> Result<()> {
+    pub async fn start(&self, credentials_sender: Sender<ECScapeCredentials>) -> Result<()> {
         let credentials = Credentials::new(
             self.imds_metadata.aws_access_key_id.as_str(),
             self.imds_metadata.aws_access_secret_key.as_str(),
@@ -43,6 +34,7 @@ impl ECScape {
             None,
             "IMDS",
         );
+
         let credentials_provider = SharedCredentialsProvider::new(credentials.clone());
 
         let region = Region::new(self.ecs_agent_metadata.region.clone());
@@ -62,6 +54,7 @@ impl ECScape {
 
         // Create ACS handler
         let acs_handler = ACSHandler::new(
+            credentials_sender,
             credentials.clone(),
             discover_poll_endpoint_output.clone(),
             self.ecs_agent_metadata.region.clone(),

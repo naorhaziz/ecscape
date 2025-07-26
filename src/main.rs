@@ -1,5 +1,6 @@
 use crate::{
     config::{ARCH, VERSION},
+    credentials_reactors::{CredentialsReactor, ECScapeCredentials, s3_reactor::S3Reactor},
     ecscape::ECScape,
 };
 use anyhow::Result;
@@ -8,12 +9,13 @@ use std::thread;
 use tokio::{
     select,
     signal::unix::{SignalKind, signal},
+    sync::broadcast,
 };
 use tracing::{error, info, warn};
 
 mod config;
+mod credentials_reactors;
 mod ecs_agent_metadata;
-mod ecs_container_instance_registrator;
 mod ecscape;
 mod imds_metadata;
 mod protocols;
@@ -25,14 +27,18 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[derive(Parser, Debug)]
 #[command(arg_required_else_help(false))]
 struct Args {
-    #[arg(long, env = "PORT", default_value = "8080")]
-    port: u16,
+    #[arg(long)]
+    s3_bucket: Option<String>,
+    #[arg(long)]
+    s3_region: Option<String>,
+    #[arg(long)]
+    secret_arn: Option<String>,
 }
 
 async fn main_inner() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let _args = match Args::try_parse() {
+    let args = match Args::try_parse() {
         Ok(args) => args,
         Err(err) => {
             error!("Failed to parse command line arguments: {:?}", err);
@@ -41,6 +47,10 @@ async fn main_inner() -> Result<()> {
     };
 
     info!("ecscape started ({}-{})", VERSION.as_str(), ARCH.as_str());
+
+    let (credentials_sender, _) = broadcast::channel::<ECScapeCredentials>(1024);
+
+    let s3_reactor = S3Reactor::new(args.s3_bucket, args.s3_region);
 
     let ecscape = ECScape::try_new().await?;
 
@@ -57,7 +67,8 @@ async fn main_inner() -> Result<()> {
             Ok(())
         }
 
-        res = ecscape.start() => res,
+        res = s3_reactor.start(credentials_sender.subscribe()) => res,
+        res = ecscape.start(credentials_sender) => res,
     };
 
     res

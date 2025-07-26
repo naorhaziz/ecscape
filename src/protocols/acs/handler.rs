@@ -1,26 +1,31 @@
-use crate::protocols::{
-    acs::{
-        request_builder::ACSRequestBuilder,
-        structs::{
-            ACSMessage, AckRequestStruct, HeartbeatAckRequestStruct,
-            IAMRoleCredentialsAckRequestStruct, RefreshCredentialsAckRequestStruct,
-            TaskStopVerificationAckStruct,
+use crate::{
+    credentials_reactors::ECScapeCredentials,
+    protocols::{
+        acs::{
+            request_builder::ACSRequestBuilder,
+            structs::{
+                ACSMessage, AckRequestStruct, HeartbeatAckRequestStruct,
+                IAMRoleCredentialsAckRequestStruct, RefreshCredentialsAckRequestStruct,
+                TaskStopVerificationAckStruct,
+            },
         },
+        protocol_client::ProtocolClient,
+        protocol_handler::ProtocolHandler,
+        request_builder::RequestBuilder,
     },
-    protocol_client::ProtocolClient,
-    protocol_handler::ProtocolHandler,
-    request_builder::RequestBuilder,
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use aws_credential_types::Credentials;
 use aws_sdk_ecs::operation::discover_poll_endpoint::DiscoverPollEndpointOutput;
 use chrono;
+use tokio::sync::broadcast::Sender;
 use tokio_tungstenite::tungstenite::http::Request;
 use tracing::{debug, error, info, warn};
 
 pub struct ACSHandler {
     request_builder: ACSRequestBuilder,
+    credentials_sender: Sender<ECScapeCredentials>,
     credentials: Credentials,
     discover_poll_endpoint_output: DiscoverPollEndpointOutput,
     region: String,
@@ -32,6 +37,7 @@ pub struct ACSHandler {
 
 impl ACSHandler {
     pub fn new(
+        credentials_sender: Sender<ECScapeCredentials>,
         credentials: Credentials,
         discover_poll_endpoint_output: DiscoverPollEndpointOutput,
         region: String,
@@ -42,6 +48,7 @@ impl ACSHandler {
     ) -> Self {
         Self {
             request_builder: ACSRequestBuilder::new(),
+            credentials_sender,
             credentials,
             discover_poll_endpoint_output,
             region,
@@ -96,7 +103,7 @@ impl ACSHandler {
                             let creds_ack_message =
                                 ACSMessage::IAMRoleCredentialsAckRequest(creds_ack);
                             client.send(&creds_ack_message).await?;
-                            info!(
+                            debug!(
                                 "Sent IAMRoleCredentialsAckRequest for task {}",
                                 task.arn.as_ref().unwrap_or(&"unknown".to_string())
                             );
@@ -178,10 +185,17 @@ impl ACSHandler {
                     };
                     let ack_message = ACSMessage::IAMRoleCredentialsAckRequest(ack);
                     client.send(&ack_message).await?;
-                    info!(
+                    debug!(
                         "Sent IAMRoleCredentialsAckRequest for message ID: {}",
                         msg.message_id
                     );
+
+                    // Broadcast credentials
+                    self.credentials_sender.send(ECScapeCredentials {
+                        access_key_id: credentials.access_key_id.clone(),
+                        secret_access_key: credentials.secret_access_key.clone(),
+                        session_token: credentials.session_token.clone(),
+                    })?;
                 } else {
                     warn!(
                         "IAMRoleCredentialsMessage missing credentials for message ID: {}",
@@ -201,7 +215,7 @@ impl ACSHandler {
                     };
                     let ack_message = ACSMessage::RefreshCredentialsAckRequest(ack);
                     client.send(&ack_message).await?;
-                    info!(
+                    debug!(
                         "Sent RefreshCredentialsAckRequest for message ID: {}",
                         msg.message_id
                     );
