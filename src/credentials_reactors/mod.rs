@@ -4,6 +4,7 @@ use tokio::sync::broadcast::{Receiver, error::RecvError};
 use tracing::{debug, error, warn};
 
 pub mod s3_reactor;
+pub mod secrets_manager_reactor;
 
 #[derive(Clone, Debug)]
 pub struct ECScapeCredentials {

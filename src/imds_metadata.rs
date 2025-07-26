@@ -4,10 +4,9 @@ use serde::Deserialize;
 
 const IMDS_BASE: &str = "http://169.254.169.254";
 const IMDS_LOCAL_IPV4_PATH: &str = "latest/meta-data/local-ipv4";
-const IMDS_IDENTITY_DOCUMENT_PATH: &str = "latest/dynamic/instance-identity/document";
-const IMDS_IDENTITY_SIGNATURE_PATH: &str = "latest/dynamic/instance-identity/signature";
 const IMDS_ROLE_NAME_PATH: &str = "latest/meta-data/iam/security-credentials";
 const IMDS_ROLE_CREDS_PATH_PREFIX: &str = "latest/meta-data/iam/security-credentials/";
+const IMDS_REGION_PATH: &str = "latest/meta-data/placement/region";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -20,8 +19,7 @@ struct ImdsRoleCredentials {
 #[derive(Debug)]
 pub struct IMDSMetadata {
     pub local_ip: String,
-    pub identity_document: String,
-    pub identity_signature: String,
+    pub region: String,
     pub aws_access_key_id: String,
     pub aws_access_secret_key: String,
     pub aws_access_token: String,
@@ -36,12 +34,7 @@ impl IMDSMetadata {
             .text()
             .await?;
 
-        let identity_document = Self::imds_get(&client, IMDS_IDENTITY_DOCUMENT_PATH)
-            .await?
-            .text()
-            .await?;
-
-        let identity_signature = Self::imds_get(&client, IMDS_IDENTITY_SIGNATURE_PATH)
+        let region = Self::imds_get(&client, IMDS_REGION_PATH)
             .await?
             .text()
             .await?;
@@ -56,8 +49,7 @@ impl IMDSMetadata {
 
         Ok(Self {
             local_ip,
-            identity_document,
-            identity_signature,
+            region,
             aws_access_key_id: creds.access_key_id,
             aws_access_secret_key: creds.secret_access_key,
             aws_access_token: creds.token,

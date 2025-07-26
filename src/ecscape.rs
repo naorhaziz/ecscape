@@ -16,8 +16,7 @@ pub struct ECScape {
 }
 
 impl ECScape {
-    pub async fn try_new() -> Result<Self> {
-        let imds_metadata = IMDSMetadata::try_new().await?;
+    pub async fn try_new(imds_metadata: IMDSMetadata) -> Result<Self> {
         let ecs_agent_metadata = ECSAgentMetadata::try_new(&imds_metadata.local_ip).await?;
 
         Ok(Self {

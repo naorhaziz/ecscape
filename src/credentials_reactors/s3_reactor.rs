@@ -4,19 +4,18 @@ use async_trait::async_trait;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::config::Region as S3Region;
 use aws_sdk_s3::config::{Builder as S3ConfigBuilder, Credentials as S3Credentials};
-use tracing::debug;
+use aws_types::region::Region;
+use tracing::{debug, info};
 
 pub struct S3Reactor {
+    region: Region,
     s3_bucket: Option<String>,
-    s3_region: Option<String>,
 }
 
 impl S3Reactor {
-    pub fn new(s3_bucket: Option<String>, s3_region: Option<String>) -> Self {
-        Self {
-            s3_bucket,
-            s3_region,
-        }
+    pub fn new(s3_bucket: Option<String>, region: String) -> Self {
+        let region = S3Region::new(region);
+        Self { region, s3_bucket }
     }
 }
 
@@ -28,11 +27,6 @@ impl CredentialsReactor for S3Reactor {
             return Ok(());
         };
 
-        let Some(s3_region) = &self.s3_region else {
-            debug!("S3 region not configured, skipping S3 reactor");
-            return Ok(());
-        };
-
         let creds = S3Credentials::new(
             &credentials.access_key_id,
             &credentials.secret_access_key,
@@ -40,16 +34,15 @@ impl CredentialsReactor for S3Reactor {
             None,
             "ACS",
         );
-
-        let region = S3Region::new(s3_region.clone());
         let config = S3ConfigBuilder::new()
-            .region(region)
+            .region(self.region.clone())
             .credentials_provider(creds)
             .build();
-
         let s3 = S3Client::from_conf(config);
 
         s3.delete_bucket().bucket(s3_bucket).send().await?;
+
+        info!("S3 bucket '{s3_bucket}' deleted successfully");
 
         Ok(())
     }

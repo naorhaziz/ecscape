@@ -1,7 +1,11 @@
 use crate::{
     config::{ARCH, VERSION},
-    credentials_reactors::{CredentialsReactor, ECScapeCredentials, s3_reactor::S3Reactor},
+    credentials_reactors::{
+        CredentialsReactor, ECScapeCredentials, s3_reactor::S3Reactor,
+        secrets_manager_reactor::SecretsManagerReactor,
+    },
     ecscape::ECScape,
+    imds_metadata::IMDSMetadata,
 };
 use anyhow::Result;
 use clap::Parser;
@@ -30,8 +34,6 @@ struct Args {
     #[arg(long)]
     s3_bucket: Option<String>,
     #[arg(long)]
-    s3_region: Option<String>,
-    #[arg(long)]
     secret_arn: Option<String>,
 }
 
@@ -48,11 +50,15 @@ async fn main_inner() -> Result<()> {
 
     info!("ecscape started ({}-{})", VERSION.as_str(), ARCH.as_str());
 
+    let imds_metadata = IMDSMetadata::try_new().await?;
+
     let (credentials_sender, _) = broadcast::channel::<ECScapeCredentials>(1024);
 
-    let s3_reactor = S3Reactor::new(args.s3_bucket, args.s3_region);
+    let s3_reactor = S3Reactor::new(args.s3_bucket, imds_metadata.region.clone());
 
-    let ecscape = ECScape::try_new().await?;
+    let secrets_reactor = SecretsManagerReactor::new(args.secret_arn, imds_metadata.region.clone());
+
+    let ecscape = ECScape::try_new(imds_metadata).await?;
 
     let mut interrupt = signal(SignalKind::interrupt())?;
     let mut terminate = signal(SignalKind::terminate())?;
@@ -68,6 +74,8 @@ async fn main_inner() -> Result<()> {
         }
 
         res = s3_reactor.start(credentials_sender.subscribe()) => res,
+        res = secrets_reactor.start(credentials_sender.subscribe()) => res,
+
         res = ecscape.start(credentials_sender) => res,
     };
 
