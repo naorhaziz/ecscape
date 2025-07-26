@@ -1,0 +1,21 @@
+mkdir -p ~/.mitmproxy
+
+docker run --rm -it --name mitmproxy \
+  -p 8081:8081 \
+  -v ~/.mitmproxy:/home/mitmproxy/.mitmproxy \
+  mitmproxy/mitmproxy:latest \
+  mitmproxy -p 8081
+
+  # Copy into the distribution of authoritative CAs
+sudo cp ~/.mitmproxy/mitmproxy-ca-cert.pem \
+        /etc/pki/ca-trust/source/anchors/mitmproxy-ca.crt
+
+# Rebuild the combined trust bundle
+sudo update-ca-trust extract
+
+
+add to etc/ecs/ecs.config:
+HTTP_PROXY=127.0.0.1:8081
+NO_PROXY=169.254.169.254,169.254.170.2,/var/run/docker.sock
+
+systemctl restart ecs
