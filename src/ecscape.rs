@@ -2,9 +2,7 @@ use crate::{
     ecs_agent_metadata::ECSAgentMetadata,
     ecs_container_instance_registrator::ECSContainerInstanceRegistrator,
     imds_metadata::IMDSMetadata,
-    protocols::{
-        acs::handler::ACSHandler, protocol_handler::ProtocolHandler, tcs::handler::TCSHandler,
-    },
+    protocols::{acs::handler::ACSHandler, protocol_handler::ProtocolHandler},
 };
 use anyhow::Result;
 use aws_credential_types::Credentials;
@@ -16,24 +14,24 @@ use tracing::info;
 pub struct ECScape {
     imds_metadata: IMDSMetadata,
     ecs_agent_metadata: ECSAgentMetadata,
-    container_instance_registrator: ECSContainerInstanceRegistrator,
+    // container_instance_registrator: ECSContainerInstanceRegistrator,
 }
 
 impl ECScape {
     pub async fn try_new() -> Result<Self> {
         let imds_metadata = IMDSMetadata::try_new().await?;
         let ecs_agent_metadata = ECSAgentMetadata::try_new(&imds_metadata.local_ip).await?;
-        let container_instance_registrator = ECSContainerInstanceRegistrator::try_new().await?;
+        // let container_instance_registrator = ECSContainerInstanceRegistrator::try_new().await?;
 
-        info!(
-            "Registering ECS container instance: {}",
-            container_instance_registrator.container_instance_arn()
-        );
+        // info!(
+        //     "Registering ECS container instance: {}",
+        //     container_instance_registrator.container_instance_arn()
+        // );
 
         Ok(Self {
             imds_metadata,
             ecs_agent_metadata,
-            container_instance_registrator,
+            // container_instance_registrator,
         })
     }
 
@@ -58,14 +56,25 @@ impl ECScape {
         let discover_poll_endpoint_output = ecs_client
             .discover_poll_endpoint()
             .cluster(&self.ecs_agent_metadata.cluster_arn)
-            .container_instance(self.container_instance_registrator.container_instance_arn())
+            .container_instance(self.ecs_agent_metadata.container_instance_arn.as_str())
             .send()
             .await?;
 
-        // // Create ACS handler
-        // let acs_handler = ACSHandler::new(
-        //     credentials.clone(),
-        //     discover_poll_endpoint_output.clone(),
+        // Create ACS handler
+        let acs_handler = ACSHandler::new(
+            credentials.clone(),
+            discover_poll_endpoint_output.clone(),
+            self.ecs_agent_metadata.region.clone(),
+            self.ecs_agent_metadata.cluster_arn.clone(),
+            self.ecs_agent_metadata.container_instance_arn.clone(),
+            self.ecs_agent_metadata.ecs_agent_version.clone(),
+            self.ecs_agent_metadata.ecs_agent_hash.clone(),
+        );
+
+        // // Create TCS handler
+        // let tcs_handler = TCSHandler::new(
+        //     credentials,
+        //     discover_poll_endpoint_output,
         //     self.ecs_agent_metadata.region.clone(),
         //     self.ecs_agent_metadata.cluster_arn.clone(),
         //     self.container_instance_registrator
@@ -75,22 +84,9 @@ impl ECScape {
         //     self.ecs_agent_metadata.ecs_agent_hash.clone(),
         // );
 
-        // Create TCS handler
-        let tcs_handler = TCSHandler::new(
-            credentials,
-            discover_poll_endpoint_output,
-            self.ecs_agent_metadata.region.clone(),
-            self.ecs_agent_metadata.cluster_arn.clone(),
-            self.container_instance_registrator
-                .container_instance_arn()
-                .to_string(),
-            self.ecs_agent_metadata.ecs_agent_version.clone(),
-            self.ecs_agent_metadata.ecs_agent_hash.clone(),
-        );
-
         select! {
-            // res = acs_handler.start() => res,
-            res = tcs_handler.start() => res,
+            res = acs_handler.start() => res,
+            // res = tcs_handler.start() => res,
         }
     }
 }

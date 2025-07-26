@@ -1,7 +1,6 @@
 use crate::ws_client::WSClient;
 use anyhow::Result;
 use serde::{Serialize, de::DeserializeOwned};
-use serde_json;
 use tokio_tungstenite::tungstenite::http::Request;
 
 pub struct ProtocolClient<T> {
