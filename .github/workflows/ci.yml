@@ -56,27 +56,44 @@ jobs:
           name: ecscape-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/ecscape
 
-  upload:
+  docker:
     needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [ x86_64, aarch64 ]
+        arch: [x86_64, aarch64]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Download Binary
+      - name: Download Built Binary
         uses: actions/download-artifact@v4
         with:
           name: ecscape-${{ matrix.arch }}-unknown-linux-musl
           path: .
 
       - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build and Tag GHCR Image
-        run: docker build --platform linux/${{ matrix.arch }} -t ghcr.io/${{ github.repository_owner }}/ecscape:latest .
+      - name: Build and Tag Docker Image
+        run: |
+          docker build --platform linux/${{ matrix.arch }} \
+            -t ghcr.io/${{ github.repository_owner }}/ecscape:${{ matrix.arch }} \
+            --build-arg ARCH=${{ matrix.arch }} .
 
-      - name: Push GHCR Image
-        run: docker push ghcr.io/${{ github.repository_owner }}/ecscape:latest
+      - name: Push Docker Image
+        run: docker push ghcr.io/${{ github.repository_owner }}/ecscape:${{ matrix.arch }}
+
+  manifest:
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Create and Push Multi-Arch Manifest
+        run: |
+          docker manifest create ghcr.io/${{ github.repository_owner }}/ecscape:latest \
+            --amend ghcr.io/${{ github.repository_owner }}/ecscape:x86_64 \
+            --amend ghcr.io/${{ github.repository_owner }}/ecscape:aarch64
+          docker manifest push ghcr.io/${{ github.repository_owner }}/ecscape:latest
