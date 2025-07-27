@@ -48,8 +48,8 @@ resource "aws_iam_role_policy_attachment" "ecscape_role_attachment" {
   policy_arn = aws_iam_policy.ecscape_policy.arn
 }
 
-resource "aws_iam_role" "high_priv_role" {
-  name = "high-priv-role"
+resource "aws_iam_role" "s3_control_role" {
+  name = "s3-control-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -65,9 +65,82 @@ resource "aws_iam_role" "high_priv_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "high_priv_role_attachment" {
-  role       = aws_iam_role.high_priv_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+resource "aws_iam_role_policy_attachment" "s3_control_role_attachment" {
+  role       = aws_iam_role.s3_control_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+# Create the secret
+resource "aws_secretsmanager_secret" "db_secret" {
+  name        = "db-secret"
+  description = "Database secret for demo"
+}
+
+resource "aws_secretsmanager_secret_version" "db_secret_version" {
+  secret_id     = aws_secretsmanager_secret.db_secret.id
+  secret_string = "SuperSecretPassword"
+}
+
+# Custom execution role with permissions to read the specific secret
+resource "aws_iam_role" "secret_execution_role" {
+  name = "secret-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Base ECS task execution permissions
+resource "aws_iam_role_policy_attachment" "secret_execution_role_base" {
+  role       = aws_iam_role.secret_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Custom policy to read the specific secret
+resource "aws_iam_policy" "read_db_secret_secret" {
+  name        = "read-db-password-secret"
+  description = "Policy to read DB_SECRET secret"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.db_secret.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "secret_execution_role_secret_policy" {
+  role       = aws_iam_role.secret_execution_role.name
+  policy_arn = aws_iam_policy.read_db_secret_secret.arn
+}
+
+# S3 bucket for demonstration
+resource "aws_s3_bucket" "s3_bucket" {
+  bucket = "blackhat-las-vegas-2025"
+}
+
+resource "aws_s3_bucket_public_access_block" "s3_bucket" {
+  bucket = aws_s3_bucket.s3_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_ecs_cluster" "ecscape" {
@@ -227,15 +300,14 @@ resource "aws_ecs_service" "ecscape_service" {
   depends_on = [aws_autoscaling_group.ecs_asg]
 }
 
-resource "aws_ecs_task_definition" "high_priv_task" {
-  family             = "high-priv-task"
+resource "aws_ecs_task_definition" "s3_control_task" {
+  family             = "s3-control-task"
   network_mode       = "host"
-  task_role_arn      = aws_iam_role.high_priv_role.arn
-  execution_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ecsTaskExecutionRole"
+  task_role_arn      = aws_iam_role.s3_control_role.arn
 
   container_definitions = jsonencode([
     {
-      name       = "high-priv"
+      name       = "s3-control"
       image      = "ubuntu:latest"
       entryPoint = ["sleep", "infinity"]
       essential  = true
@@ -245,10 +317,50 @@ resource "aws_ecs_task_definition" "high_priv_task" {
   ])
 }
 
-resource "aws_ecs_service" "high_priv_service" {
-  name            = "high-priv-service"
+resource "aws_ecs_service" "s3_control_service" {
+  name            = "s3-control-service"
   cluster         = aws_ecs_cluster.ecscape.id
-  task_definition = aws_ecs_task_definition.high_priv_task.arn
+  task_definition = aws_ecs_task_definition.s3_control_task.arn
+  desired_count   = 1
+
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.ecscape_capacity_provider.name
+    weight            = 100
+    base              = 1
+  }
+
+  depends_on = [aws_autoscaling_group.ecs_asg]
+}
+
+resource "aws_ecs_task_definition" "database_task" {
+  family             = "database-task"
+  network_mode       = "host"
+  execution_role_arn = aws_iam_role.secret_execution_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name       = "database-app"
+      image      = "ubuntu:latest"
+      entryPoint = ["sleep", "infinity"]
+      essential  = true
+      memory     = 512
+      cpu        = 256
+      
+      # Secret from Secrets Manager exposed as environment variable
+      secrets = [
+        {
+          name      = "DB_SECRET"
+          valueFrom = aws_secretsmanager_secret.db_secret.arn
+        }
+      ]
+    }
+  ])
+}
+
+resource "aws_ecs_service" "database_service" {
+  name            = "database-service"
+  cluster         = aws_ecs_cluster.ecscape.id
+  task_definition = aws_ecs_task_definition.database_task.arn
   desired_count   = 1
 
   capacity_provider_strategy {
