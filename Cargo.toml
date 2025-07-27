@@ -31,7 +31,7 @@ reqwest = { version = "0.12.22", default-features = false, features = [
     "rustls-tls",
     "json",
 ] }
-rustls = { version = "0.23.29", features = ["ring"] }
+rustls = { version = "0.23.30", features = ["ring"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.141"
 sysinfo = "0.36.1"
