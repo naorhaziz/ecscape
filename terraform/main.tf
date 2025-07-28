@@ -372,3 +372,125 @@ resource "aws_ecs_service" "database_service" {
   depends_on = [aws_autoscaling_group.ecs_asg]
 }
 
+resource "aws_s3_bucket" "cloudtrail_bucket" {
+  bucket        = "ecscape-cloudtrail-${random_id.bucket_suffix.hex}"
+  force_destroy = true
+}
+
+resource "random_id" "bucket_suffix" {
+  byte_length = 4
+}
+
+resource "aws_s3_bucket_public_access_block" "cloudtrail_bucket" {
+  bucket = aws_s3_bucket.cloudtrail_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_policy" "cloudtrail_bucket_policy" {
+  bucket = aws_s3_bucket.cloudtrail_bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSCloudTrailAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = aws_s3_bucket.cloudtrail_bucket.arn
+      },
+      {
+        Sid    = "AWSCloudTrailWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.cloudtrail_bucket.arn}/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl" = "bucket-owner-full-control"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# CloudWatch Log Group for CloudTrail
+resource "aws_cloudwatch_log_group" "cloudtrail_logs" {
+  name              = "/aws/cloudtrail/ecscape"
+  retention_in_days = 7
+}
+
+# IAM Role for CloudTrail to write to CloudWatch
+resource "aws_iam_role" "cloudtrail_role" {
+  name = "ecscape-cloudtrail-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudtrail_logs_policy" {
+  name = "ecscape-cloudtrail-logs-policy"
+  role = aws_iam_role.cloudtrail_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/cloudtrail/ecscape*"
+      }
+    ]
+  })
+}
+
+# CloudTrail itself
+resource "aws_cloudtrail" "ecscape_trail" {
+  name           = "ecscape-trail"
+  s3_bucket_name = aws_s3_bucket.cloudtrail_bucket.bucket
+
+  # Log to CloudWatch Logs
+  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail_logs.arn}:*"
+  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_role.arn
+
+  # Log data events for S3
+  event_selector {
+    read_write_type                 = "All"
+    include_management_events       = true
+    exclude_management_event_sources = []
+
+    # Log S3 data events
+    data_resource {
+      type   = "AWS::S3::Object"
+      values = ["${aws_s3_bucket.s3_bucket.arn}/*"]
+    }
+  }
+
+  depends_on = [aws_s3_bucket_policy.cloudtrail_bucket_policy]
+}
+
