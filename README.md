@@ -26,7 +26,7 @@ This PoC is shared for educational and ethical research purposes under the [MIT 
 ## Contact
 
 - LinkedIn: [https://www.linkedin.com/in/naorhaziz](https://www.linkedin.com/in/naorhaziz)
-- Twitter: [@naorhaziz](https://twitter.com/naorhaziz)
+- Twitter: [https://x.com/naor_haziz](https://x.com/naor_haziz)
 - GitHub: [https://github.com/naorhaziz](https://github.com/naorhaziz)
 
 ---
