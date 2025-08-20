@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/naorhaziz/ecscape/blob/main/logo.png?raw=true" alt="ECScape" width="350">
+</p>
+
 # ECSCape
 
 **ECSCape** is a proof‑of‑concept exploit demonstrating a privilege‑escalation vulnerability in **Amazon ECS (EC2 launch type)**. It allows a low‑privileged ECS task to hijack **IAM credentials** of other tasks running on the same container instance, breaking task isolation. It can obtain the **task execution role** credentials (the agent‑only identity used by ECS to pull images, push logs, decrypt, etc.), which are **not intended to be accessible by containers**.
@@ -6,7 +10,14 @@
 > - Tasks must run on an **EC2 instance managed by ECS** (EC2 launch type), with other tasks running on the same host.
 > - Not applicable to Fargate.
 
-**Research:** [Naor Haziz](https://github.com/naorhaziz)
+---
+
+## Blog posts
+
+For the full deep dive and technical explanation:  
+
+- [Part 1: Under the Hood of Amazon ECS on EC2 - Agents, IAM Roles, and Task Isolation](https://naorhaziz.com/posts/under-the-hood-of-amazon-ecs/)  
+- [Part 2: ECScape - Understanding IAM Privilege Boundaries in Amazon ECS](https://naorhaziz.com/posts/ecscape-iam-privilege-boundaries-in-ecs/)
 
 ---
 
